@@ -1,32 +1,3 @@
-terraform {
-  required_providers {
-    helm = {
-      source  = "hashicorp/helm"
-      version = "2.5.1"
-    }
-    kubernetes = {
-      source  = "hashicorp/kubernetes"
-      version = "~>2.11.0"
-    }
-  }
-}
-
-provider "kubernetes" {
-  host                   = azurerm_kubernetes_cluster.kubernetes.kube_config.0.host
-  client_certificate     = base64decode(azurerm_kubernetes_cluster.kubernetes.kube_config.0.client_certificate)
-  client_key             = base64decode(azurerm_kubernetes_cluster.kubernetes.kube_config.0.client_key)
-  cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.kubernetes.kube_config.0.cluster_ca_certificate)
-}
-
-provider "helm" {
-  kubernetes {
-    host                   = azurerm_kubernetes_cluster.kubernetes.kube_config.0.host
-    client_certificate     = base64decode(azurerm_kubernetes_cluster.kubernetes.kube_config.0.client_certificate)
-    client_key             = base64decode(azurerm_kubernetes_cluster.kubernetes.kube_config.0.client_key)
-    cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.kubernetes.kube_config.0.cluster_ca_certificate)
-  }
-}
-
 resource "azurerm_public_ip" "cluster_ip" {
   name                = "${var.name}-cluster-public-IP"
   location            = data.azurerm_resource_group.resource_group.location
@@ -51,7 +22,7 @@ resource "azurerm_kubernetes_cluster" "kubernetes" {
   }
 
   name                              = var.name
-  node_resource_group               = "MC_aks-node-rg-${var.name}"
+  node_resource_group               = "MC_aks-node-rg-${var.name}-${var.environment_name}"
   sku_tier                          = var.sku_tier
   location                          = data.azurerm_resource_group.resource_group.location
   resource_group_name               = data.azurerm_resource_group.resource_group.name
@@ -122,18 +93,18 @@ resource "azurerm_kubernetes_cluster" "kubernetes" {
 }
 
 resource "azurerm_kubernetes_cluster_node_pool" "worker_node_pool" {
-  count = var.aks_second_nodepool == true ? 1 : 0
+  for_each = var.aks_additional_nodepools_config
 
-  name                  = var.aks_second_nodepool_configuration.node_pool_name
+  name                  = each.value.node_pool_name
   kubernetes_cluster_id = azurerm_kubernetes_cluster.kubernetes.id
-  vm_size               = var.aks_second_nodepool_configuration.vm_size
-  os_disk_size_gb       = var.aks_second_nodepool_configuration.os_disk_size_gb
-  node_count            = var.aks_second_nodepool_configuration.kubernetes_node_count
-  enable_auto_scaling   = var.aks_second_nodepool_configuration.kubernetes_enable_auto_scaling
-  min_count             = var.aks_second_nodepool_configuration.kubernetes_min_node_count
-  max_count             = var.aks_second_nodepool_configuration.kubernetes_max_node_count
-  vnet_subnet_id        = var.aks_subnet_id
-  max_pods              = var.aks_second_nodepool_configuration.max_pods
+  vm_size               = each.value.vm_size
+  os_disk_size_gb       = each.value.os_disk_size_gb
+  node_count            = each.value.kubernetes_node_count
+  enable_auto_scaling   = each.value.kubernetes_enable_auto_scaling
+  min_count             = each.value.kubernetes_min_node_count
+  max_count             = each.value.kubernetes_max_node_count
+  vnet_subnet_id        = each.value.subnet_id
+  max_pods              = each.value.max_pods
   orchestrator_version  = var.aks_configuration.kubernetes_version
 }
 
@@ -167,10 +138,10 @@ resource "helm_release" "nginx_ingress_controller" {
   count      = var.ingress_controller == true ? 1 : 0
   depends_on = [kubernetes_namespace.nginx_ingress_namespace[0]]
 
-  name       = "nginx-ingress-controller"
+  name       = "ingress-nginx"
   repository = "https://kubernetes.github.io/ingress-nginx"
   chart      = "ingress-nginx"
-  version    = "4.4.0"
+  version    = "4.7.0"
   namespace  = kubernetes_namespace.nginx_ingress_namespace[0].metadata[0].name
   values = [
     file("${path.module}/nginx-values.yml")
@@ -206,7 +177,7 @@ resource "helm_release" "argo_cd" {
   name       = "argocd"
   repository = "https://argoproj.github.io/argo-helm"
   chart      = "argo-cd"
-  version    = "5.16.2"
+  version    = "5.36.10"
   namespace  = kubernetes_namespace.argo_cd_namespace[0].metadata[0].name
   # Documentation on possible values can be found here: https://github.com/argoproj/argo-helm/blob/main/charts/argo-cd/README.md
   values = [
