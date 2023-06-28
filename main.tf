@@ -141,7 +141,7 @@ resource "helm_release" "nginx_ingress_controller" {
   name       = "nginx-ingress-controller"
   repository = "https://kubernetes.github.io/ingress-nginx"
   chart      = "ingress-nginx"
-  version    = "4.4.0"
+  version    = "4.7.0"
   namespace  = kubernetes_namespace.nginx_ingress_namespace[0].metadata[0].name
   values = [
     file("${path.module}/nginx-values.yml")
@@ -177,7 +177,7 @@ resource "helm_release" "argo_cd" {
   name       = "argocd"
   repository = "https://argoproj.github.io/argo-helm"
   chart      = "argo-cd"
-  version    = "5.16.2"
+  version    = "5.36.10"
   namespace  = kubernetes_namespace.argo_cd_namespace[0].metadata[0].name
   # Documentation on possible values can be found here: https://github.com/argoproj/argo-helm/blob/main/charts/argo-cd/README.md
   values = [
