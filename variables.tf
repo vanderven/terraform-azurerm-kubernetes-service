@@ -1,6 +1,11 @@
-variable "resource_group" {
+variable "resource_group_name" {
   type        = string
   description = "The resource group where the cluster will be created"
+
+  validation {
+    condition     = length(var.resource_group_name) <= 63
+    error_message = "Resource group name can only be 63 characters long."
+  }
 }
 
 variable "name" {
@@ -45,7 +50,7 @@ variable "public_network_access_enabled" {
 
 variable "use_managed_identity" {
   type        = bool
-  description = "Toggles wether the AKS is built using a managed identity (true) or a Service Principal to authenticate within Azure Cloud (false); Managed Identity is the recommended approach."
+  description = "Toggles whether the AKS is built using a managed identity (true) or a Service Principal to authenticate within Azure Cloud (false); Managed Identity is the recommended approach."
   default     = true
 }
 
@@ -65,8 +70,8 @@ variable "environment_name" {
   description = "The name of the environment to deploy the AKS cluster in, commonly used names are dev, qa and prod."
 
   validation {
-    condition     = contains(["dev", "staging", "ppe", "qa", "prod", "prd", "all"], var.environment_name)
-    error_message = "Valid values for variable: environment_name are (dev, staging, ppe, qa, prod, prd, all)."
+    condition     = contains(["dev", "staging", "stage", "test", "tst", "ppe", "qa", "prod", "prd", "all"], var.environment_name)
+    error_message = "Valid values for variable: environment_name are (dev, staging, stage, test, tst, ppe, qa, prod, prd, all)."
   }
 }
 
@@ -147,41 +152,22 @@ variable "aks_configuration" {
   }
 }
 
-variable "aks_second_nodepool_configuration" {
-  description = "Defines AKS user nodepool performance and size parameters"
-  type = object({
+variable "aks_additional_nodepools_config" {
+  type = map(object({
     vm_size                        = string
     os_disk_size_gb                = number
     kubernetes_node_count          = number
     kubernetes_min_node_count      = number
     kubernetes_max_node_count      = number
     kubernetes_enable_auto_scaling = bool
+    subnet_id                      = string
     max_pods                       = number
     node_pool_name                 = string
-  })
-  default = {
-    vm_size                        = "Standard_B2s"
-    os_disk_size_gb                = 32
-    kubernetes_node_count          = 1
-    kubernetes_min_node_count      = 1
-    kubernetes_max_node_count      = 1
-    kubernetes_enable_auto_scaling = true
-    max_pods                       = 30
-    node_pool_name                 = "workerpool"
-  }
-
-  validation {
-    condition     = var.aks_second_nodepool_configuration.node_pool_name < 16
-    error_message = "value of `temporary_name_for_rotation` must be less than 16 characters."
-  }
-  validation {
-    condition     = var.aks_second_nodepool_configuration.os_disk_size_gb > 32
-    error_message = "The value of `os_disk_size_gb` must be greater than 32."
-  }
-
+  }))
+  default = {}
 }
 
-variable "aks_second_nodepool" {
+variable "aks_additional_nodepools_enabled" {
   type        = bool
   description = "Toggles wether the AKS is using an additional nodepool. Make sure that load_balancer_sku has to be set to 'standard'"
   default     = false
@@ -238,4 +224,10 @@ variable "ip_domain_name_label" {
     condition     = can(regex("^[a-z0-9-]{1,16}$", var.ip_domain_name_label))
     error_message = "The value `ip_domain_name_label` must be no more than 16 characters and only contain lowercase letters, dashes, and numbers"
   }
+}
+
+variable "acr_id" {
+  type        = string
+  default     = null
+  description = "The ID of the Azure Container Registry to use with the AKS cluster"
 }
